@@ -14,7 +14,7 @@ dependencies:
 
   cupertino_icons: ^1.0.6
   http: ^0.13.5
-  carousel_slider: ^4.0.0
+  carousel_slider: ^5.0.0
   flutter_svg: ^1.0.3
   font_awesome_flutter: ^10.1.0
   google_fonts: ^4.0.0
@@ -23,6 +23,9 @@ dependencies:
   avatar_glow: ^2.0.0
   image_picker: ^0.8.4+8
   shared_preferences: ^2.0.6
+  flutter_rating_bar: ^4.0.0
+  provider: ^6.1.2
+  flutter_dotenv: ^5.0.2
 
 
 dev_dependencies:
@@ -41,15 +44,35 @@ flutter_icons:
 flutter:
   uses-material-design: true
   assets:
+    - .env
     - assets/1.jpg
     - assets/2.jpg
     - assets/3.jpg
     - assets/4.jpg
     - assets/5.jpg
     - assets/6.jpg
+    - assets/7.jpg
     - assets/logoapp.png
     - assets/logo2.png
     - assets/Logopathi.png
     - assets/loginpathi.png
     - assets/logo.svg
     - assets/avatar.png
+    - assets/icons/Cart Icon.svg
+    - assets/icons/Bell.svg
+    - assets/icons/Flash Icon.svg
+    - assets/icons/Game Icon.svg
+    - assets/icons/Gift Icon.svg
+    - assets/icons/Discover.svg
+    - assets/icons/Service.svg
+    - assets/icons/Tag.svg
+    - assets/icons/Plus Icon.svg
+    - assets/images/Image Banner 3.png
+    - assets/images/Image Banner 2.png
+    - assets/icons/User Icon.svg
+    - assets/images/
+    - assets/icons/
+    - assets/images/statue_of_liberty.png
+    - assets/images/eiffel_tower.png
+    - assets/images/great_wall_of_china.png
+    - assets/images/sydney_opera_house.png
