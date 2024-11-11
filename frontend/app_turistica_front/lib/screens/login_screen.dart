@@ -1,14 +1,16 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide CarouselController;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-import 'home_screen.dart';
+import 'home/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
+  static String routeName = "/login";
 
   @override
   _LoginScreenState createState() => _LoginScreenState();
@@ -48,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> login() async {
     final response = await http.post(
-      Uri.parse('http://10.0.0.150:3000/login'), // Asegúrate de usar la IP de tu backend
+      Uri.parse('${dotenv.env['API_BASE_URL']}/login'), // Asegúrate de usar la IP de tu backend
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
         'email': _emailController.text,

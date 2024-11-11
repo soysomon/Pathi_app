@@ -131,7 +131,7 @@ class WelcomeScreen extends StatelessWidget {
                       ),
                       child: ElevatedButton(
                         onPressed: () {
-                          Navigator.pushNamed(context, '/login');
+                          Navigator.pushNamed(context, '/register');
                         },
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 120, vertical: 5),
