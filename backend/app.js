@@ -6,15 +6,20 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const pool = require('./db'); // Importar la conexión de la base de datos
+const cors = require('cors');
 
 const app = express();
 const port = 3000;
+
+app.use(cors());
 
 // Crear la carpeta de "uploads" si no existe
 const uploadDir = './uploads';
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
 }
+
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use(bodyParser.json());
 
@@ -152,14 +157,14 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png/;
+    const filetypes = /jpeg|jpg|png|gif|bmp|webp/;
     const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = filetypes.test(file.mimetype);
+    const mimetype = file.mimetype.startsWith('image/') || file.mimetype === 'application/octet-stream';
 
-    if (mimetype && extname) {
-      return cb(null, true);
+    if (extname && mimetype) {
+      cb(null, true);
     } else {
-      cb(new Error('Solo se permiten imágenes en formato JPEG o PNG'));
+      cb(new Error('Solo se permiten imágenes en formato JPEG, PNG, GIF, BMP o WebP'));
     }
   }
 });
