@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 
 class ApiService {
-  final String baseUrl = 'http://10.0.0.150:3000';
+  final String baseUrl = '${dotenv.env['API_BASE_URL']}';
 
   // Obtener datos de perfil
   Future<Map<String, dynamic>> getProfile(String token) async {
