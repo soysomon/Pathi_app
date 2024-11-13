@@ -16,7 +16,7 @@ class Places extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: SectionTitle(
-            title: "Lugares Destacados",
+            title: "Destinos",
             press: () {
               Navigator.pushNamed(context, ServicesScreen.routeName);
             },

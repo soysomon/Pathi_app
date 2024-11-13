@@ -11,7 +11,7 @@ class TopServices extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text(
-            "Servicios Destacados",
+            "Servicios",
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,

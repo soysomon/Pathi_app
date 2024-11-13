@@ -9,12 +9,22 @@ class DestinationDetailsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.only(
+      borderRadius: const BorderRadius.only(
         topLeft: Radius.circular(20.0),
         topRight: Radius.circular(20.0),
       ),
       child: Container(
         height: MediaQuery.of(context).size.height * 0.75,
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              spreadRadius: 5,
+              blurRadius: 7,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
         child: Stack(
           children: [
             // Imagen en la parte inferior
@@ -32,11 +42,24 @@ class DestinationDetailsCard extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withOpacity(0.9),
+                      Colors.black.withOpacity(0.7),
                       Colors.transparent,
+                      Colors.black.withOpacity(0.9),
                     ],
+                    stops: [0.1, 0.5, 0.9],
                   ),
                 ),
+              ),
+            ),
+            // Botón de favorito
+            Positioned(
+              top: 20,
+              right: 20,
+              child: IconButton(
+                icon: Icon(Icons.favorite_border, color: Colors.white),
+                onPressed: () {
+                  // Acción para el botón de favorito
+                },
               ),
             ),
             // Detalles del destino
@@ -48,9 +71,16 @@ class DestinationDetailsCard extends StatelessWidget {
                   Text(
                     destination['name'],
                     style: const TextStyle(
-                      fontSize: 24,
+                      fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
+                      shadows: [
+                        Shadow(
+                          blurRadius: 10.0,
+                          color: Colors.black,
+                          offset: Offset(3.0, 3.0),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -95,6 +125,54 @@ class DestinationDetailsCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.blueAccent, width: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          backgroundColor: Colors.white,
+                        ),
+                        onPressed: () {
+                          // Acción para el botón de servicios
+                        },
+                        child: const Text(
+                          'Servicios',
+                          style: TextStyle(color: Colors.black),
+                        ),
+                      ),
+                      OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.greenAccent, width: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          backgroundColor: Colors.white,
+                        ),
+                        onPressed: () {
+                          // Acción para el botón de reservar
+                        },
+                        child: const Text(
+                          'Reservar',
+                          style: TextStyle(color: Colors.black),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
