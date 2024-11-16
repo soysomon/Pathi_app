@@ -21,6 +21,7 @@ if (!fs.existsSync(uploadDir)) {
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/imagenes_emp', express.static(path.join(__dirname, 'imagenes_emp')));
+app.use('/imagenes_servicios', express.static(path.join(__dirname, 'imagenes_servicios')));
 
 app.use(bodyParser.json());
 
@@ -353,5 +354,73 @@ app.get('/destinos', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Error al obtener la lista de usuarios' });
+  }
+});
+
+const storageServ = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDirServ = './imagenes_servicios';
+    if (!fs.existsSync(uploadDirServ)) {
+      fs.mkdirSync(uploadDirServ);
+    }
+    cb(null, uploadDirServ);  // Carpeta para guardar las imágenes de servicios
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));  // Nombre único para cada archivo
+  }
+});
+
+const uploadServ = multer({
+  storage: storageServ,
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|gif|bmp|webp/;
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = file.mimetype.startsWith('image/') || file.mimetype === 'application/octet-stream';
+
+    if (extname && mimetype) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten imágenes en formato JPEG, PNG, GIF, BMP o WebP'));
+    }
+  }
+});
+
+// Ruta para registrar un nuevo servicio (sólo empresas)
+app.post('/registrar_servicios', authenticateToken, checkRole(['turista']), uploadServ.single('imagen_servicio'), async (req, res) => {
+  const { nombre, descripcion, precio, ubicacion } = req.body;
+  const empresaId = req.user.userId;
+  let imagenServicioUrl = null;
+
+  if (req.file) {
+    imagenServicioUrl = `imagenes_servicios/${req.file.filename}`;
+  }
+
+  try {
+    const result = await pool.query(
+      'INSERT INTO servicios (nombre, descripcion, empresa_id, creado_en, precio, ubicacion, imagen_servicio) VALUES ($1, $2, $3, NOW(), $4, $5, $6) RETURNING id',
+      [nombre, descripcion, empresaId, precio, ubicacion, imagenServicioUrl]
+    );
+
+    res.status(201).json({ message: 'Servicio registrado correctamente', servicioId: result.rows[0].id });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al registrar el servicio' });
+  }
+});
+
+// Ruta para listar todos los servicios de una empresa por su empresaId
+app.get('/empresa/:empresaId/servicios', authenticateToken, async (req, res) => {
+  const { empresaId } = req.params;
+
+  try {
+    const result = await pool.query('SELECT * FROM servicios WHERE empresa_id = $1', [empresaId]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'No se encontraron servicios para esta empresa' });
+    }
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al obtener los servicios de la empresa' });
   }
 });
