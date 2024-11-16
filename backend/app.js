@@ -20,6 +20,7 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/imagenes_emp', express.static(path.join(__dirname, 'imagenes_emp')));
 
 app.use(bodyParser.json());
 
@@ -195,6 +196,7 @@ app.get('/perfil', authenticateToken, async (req, res) => {
     if (result.rows.length > 0) {
       const user = result.rows[0];
       res.status(200).json({
+        id: req.user.userId,
         nombre: user.nombre,
         nombre_usuario: user.nombre_usuario,
         email: user.email,
@@ -284,4 +286,72 @@ app.use((err, req, res, next) => {
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`Servidor corriendo en el puerto ${port}`);
+});
+
+// Configuración de multer para manejar el almacenamiento de imágenes empresariales
+const storageEmp = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDirEmp = './imagenes_emp';
+    if (!fs.existsSync(uploadDirEmp)) {
+      fs.mkdirSync(uploadDirEmp);
+    }
+    cb(null, uploadDirEmp);  // Carpeta para guardar las imágenes empresariales
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));  // Nombre único para cada archivo
+  }
+});
+
+const uploadEmp = multer({
+  storage: storageEmp,
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|gif|bmp|webp/;
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = file.mimetype.startsWith('image/') || file.mimetype === 'application/octet-stream';
+
+    if (extname && mimetype) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten imágenes en formato JPEG, PNG, GIF, BMP o WebP'));
+    }
+  }
+});
+
+// Endpoint para actualizar los campos ubicacion, imagen_empresarial y detalles
+app.put('/update_company_fields/:id', authenticateToken, uploadEmp.single('imagen_empresarial'), async (req, res) => {
+  const { id } = req.params;
+  const { ubicacion, detalles } = req.body;
+  let imagenEmpresarialUrl = null;
+
+  if (req.file) {
+    imagenEmpresarialUrl = `imagenes_emp/${req.file.filename}`;
+  }
+
+  try {
+    const result = await pool.query(
+      'UPDATE usuarios SET ubicacion = $1, imagen_empresarial = $2, detalles = $3 WHERE id = $4',
+      [ubicacion, imagenEmpresarialUrl, detalles, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    res.status(200).json({ message: 'Campos actualizados correctamente' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al actualizar los campos' });
+  }
+});
+
+// Ruta para listar todos los usuarios
+app.get('/destinos', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, nombre_usuario, ubicacion, detalles, imagen_empresarial FROM usuarios WHERE rol = 'turista'");
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al obtener la lista de usuarios' });
+  }
 });
