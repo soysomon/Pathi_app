@@ -200,7 +200,7 @@ app.post('/perfil/foto', authenticateToken, upload.single('foto'), async (req, r
 // Ruta para obtener el perfil del usuario
 app.get('/perfil', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query('SELECT nombre, nombre_usuario, email, foto_url FROM usuarios WHERE id = $1', [req.user.userId]);
+    const result = await pool.query('SELECT nombre, nombre_usuario, email, foto_url, rol FROM usuarios WHERE id = $1', [req.user.userId]);
     if (result.rows.length > 0) {
       const user = result.rows[0];
       res.status(200).json({
@@ -208,7 +208,8 @@ app.get('/perfil', authenticateToken, async (req, res) => {
         nombre: user.nombre,
         nombre_usuario: user.nombre_usuario,
         email: user.email,
-        foto_url: user.foto_url ? `http://localhost:3000/${user.foto_url}` : null
+        foto_url: user.foto_url ? `http://localhost:3000/${user.foto_url}` : null,
+        rol: user.rol
       });
     }
   } catch (error) {
@@ -216,9 +217,6 @@ app.get('/perfil', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Error al obtener los datos del perfil' });
   }
 });
-
-
-
 
 // Ruta para eliminar un servicio (sólo empresas)
 app.delete('/servicios/:id', authenticateToken, checkRole(['empresa']), checkServicioExists, async (req, res) => {
@@ -357,7 +355,7 @@ app.put('/update_company_fields/:id', authenticateToken, uploadEmp.single('image
 // Ruta para listar todos los usuarios
 app.get('/destinos', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query("SELECT id, nombre_usuario, ubicacion, detalles, imagen_empresarial FROM usuarios WHERE rol = 'turista' AND publico = true");
+    const result = await pool.query("SELECT id, nombre_usuario, ubicacion, detalles, imagen_empresarial FROM usuarios WHERE rol = 'empresa' AND publico = true");
     res.status(200).json(result.rows);
   } catch (error) {
     console.error(error);
@@ -395,7 +393,7 @@ const uploadServ = multer({
 });
 
 // Ruta para registrar un nuevo servicio (sólo empresas)
-app.post('/registrar_servicios', authenticateToken, checkRole(['turista']), uploadServ.single('imagen_servicio'), async (req, res) => {
+app.post('/registrar_servicios', authenticateToken, uploadServ.single('imagen_servicio'), async (req, res) => {
   const { nombre, descripcion, precio, ubicacion } = req.body;
   const empresaId = req.user.userId;
   let imagenServicioUrl = null;
@@ -599,7 +597,7 @@ app.get('/buscar-destinos', authenticateToken, async (req, res) => {
     const query = `
       SELECT id, nombre_usuario, ubicacion, detalles, imagen_empresarial 
       FROM usuarios 
-      WHERE rol = 'turista' 
+      WHERE rol = 'empresa' 
         AND publico = true 
         AND (nombre_usuario ILIKE $1 OR ubicacion ILIKE $1 OR detalles ILIKE $1)
     `;
@@ -736,7 +734,7 @@ app.get('/buscar-destinos', authenticateToken, async (req, res) => {
     const query = `
       SELECT id, nombre_usuario, ubicacion, detalles, imagen_empresarial 
       FROM usuarios 
-      WHERE rol = 'turista' 
+      WHERE rol = 'empresa' 
         AND publico = true 
         AND (nombre_usuario ILIKE $1 OR ubicacion ILIKE $1 OR detalles ILIKE $1)
     `;
@@ -761,3 +759,40 @@ app.get('/usuarios/top-reservas', authenticateToken, async (req, res) => {
   }
 });
 
+// Ruta para listar todas las reservas del usuario logueado (solo para empresas)
+app.get('/listar_clientes', authenticateToken, async (req, res) => {
+  const usuario_registrado = req.user.userId; // Obtener el ID del usuario logueado
+
+  try {
+    const result = await pool.query(`
+      SELECT r.*, u.*
+      FROM reservas r
+      JOIN usuarios u ON r.usuario_id = u.id
+      WHERE r.usuario_id = $1
+    `, [usuario_registrado]);
+
+    if (result.rows.length === 0) {
+      console.log('No se encontraron reservas para el usuario registrado.');
+    }
+
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al obtener las reservas' });
+  }
+});
+
+// Ruta para obtener solo el rol del usuario autenticado
+app.get('/obtener_rol', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT rol FROM usuarios WHERE id = $1', [req.user.userId]);
+    if (result.rows.length > 0) {
+      res.status(200).json({ rol: result.rows[0].rol });
+    } else {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+  } catch (error) {
+    console.error('Error al obtener el rol del usuario:', error);
+    res.status(500).json({ error: 'Error al obtener el rol del usuario' });
+  }
+});
