@@ -1,5 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:shimmer/shimmer.dart';
 
 class ProfilePic extends StatelessWidget {
   const ProfilePic({
@@ -9,6 +11,7 @@ class ProfilePic extends StatelessWidget {
     required this.imagePath,
     required this.onImageTap,
     required this.onEditTap,
+    this.isLoading = false,
   }) : super(key: key);
 
   final String name;
@@ -16,6 +19,7 @@ class ProfilePic extends StatelessWidget {
   final String imagePath;
   final VoidCallback onImageTap;
   final VoidCallback onEditTap;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -34,20 +38,36 @@ class ProfilePic extends StatelessWidget {
             GestureDetector(
               onTap: onImageTap,
               child: SizedBox(
-                height: 115,
-                width: 115,
+                height: 100, // Aumenta el tamaño aquí
+                width: 100,  // Aumenta el tamaño aquí
                 child: Stack(
                   fit: StackFit.expand,
                   clipBehavior: Clip.none,
                   children: [
                     CircleAvatar(
-                      backgroundImage: imagePath.startsWith('http')
-                          ? NetworkImage(imagePath)
-                          : AssetImage(imagePath) as ImageProvider,
-                      child: imagePath.startsWith('http')
-                          ? null
-                          : Image.asset(imagePath),
+                      radius: 75, // Aumenta el tamaño aquí
+                      backgroundColor: Colors.transparent,
+                      child: CachedNetworkImage(
+                        imageUrl: imagePath,
+                        placeholder: (context, url) => Shimmer.fromColors(
+                          baseColor: Colors.grey[300]!,
+                          highlightColor: Colors.grey[100]!,
+                          child: CircleAvatar(
+                            radius: 75, // Aumenta el tamaño aquí
+                            backgroundColor: Colors.grey[300],
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Image.asset('assets/avatar.png'),
+                        imageBuilder: (context, imageProvider) => CircleAvatar(
+                          radius: 75, // Aumenta el tamaño aquí
+                          backgroundImage: imageProvider,
+                        ),
+                      ),
                     ),
+                    if (isLoading)
+                      const Center(
+                        child: CircularProgressIndicator(),
+                      ),
                     Positioned(
                       right: -16,
                       bottom: 0,
@@ -88,7 +108,7 @@ class ProfilePic extends StatelessWidget {
                   Text(
                     email,
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: 13,
                       color: Colors.grey,
                     ),
                   ),
