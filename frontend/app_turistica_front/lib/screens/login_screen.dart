@@ -5,8 +5,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'loading/loading_screen.dart'; // Importa la pantalla de carga
 
-import 'home/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -48,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Future<void> login() async {
+    Future<void> login() async {
     final response = await http.post(
       Uri.parse('${dotenv.env['API_BASE_URL']}/login'), // Asegúrate de usar la IP de tu backend
       headers: {'Content-Type': 'application/json'},
@@ -57,21 +57,21 @@ class _LoginScreenState extends State<LoginScreen> {
         'password': _passwordController.text,
       }),
     );
-
+  
     if (response.statusCode == 200) {
       final responseData = json.decode(response.body);
       String token = responseData['token'];
-
+  
       // Guarda el token en el almacenamiento local para futuras solicitudes
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('jwt_token', token);
       print('Token guardado: $token');
-
+  
       // Redirige a la pantalla principal con animación
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => HomeScreen(),
+          pageBuilder: (context, animation, secondaryAnimation) => LoadingScreen(),
           transitionDuration: const Duration(milliseconds: 500),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(
