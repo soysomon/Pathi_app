@@ -38,9 +38,9 @@ class ReservationCard extends StatelessWidget {
         child: Row(
           children: [
             Padding(
-              padding: const EdgeInsets.only(left: 10), // Added padding to the left of the image
+              padding: const EdgeInsets.all(10), // Added padding around the image
               child: ClipRRect(
-                borderRadius: BorderRadius.horizontal(left: Radius.circular(20)),
+                borderRadius: BorderRadius.circular(20), // Make the image have rounded corners on all sides
                 child: CachedNetworkImage(
                   imageUrl: image.isNotEmpty
                       ? '${dotenv.env['API_BASE_URL']}/$image'
