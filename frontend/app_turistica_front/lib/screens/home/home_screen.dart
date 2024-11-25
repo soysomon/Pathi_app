@@ -1,3 +1,4 @@
+import 'package:app_turistica_front/screens/client/clients_screen.dart';
 import 'package:app_turistica_front/screens/destinations/destinations_screen.dart';
 import 'package:app_turistica_front/screens/promotions/promotions_screen.dart';
 import 'package:app_turistica_front/screens/reservations/reservations_screen.dart';
@@ -10,7 +11,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 
 // Importa la pantalla de perfil
-import '../profile/profile_screen.dart';
 import 'components/categories.dart';
 import 'components/home_header.dart';
 import 'components/places.dart';
@@ -27,6 +27,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String data = 'Cargando...';
   int _selectedIndex = 0;
+  String? userRole;
 
   // Lista de pantallas para el BottomNavigationBar
   final List<Widget> _screens = [
@@ -34,13 +35,58 @@ class _HomeScreenState extends State<HomeScreen> {
     DestinationsScreen(),
     ReservationScreen(), // Pantalla de Reservas
     PromotionsScreen(),
-    ProfileScreen(), // Pantalla de Perfil
+    ClientsScreen(), // Pantalla de Clientes
   ];
+
+    Future<void> fetchRol() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final token = await prefs.getString('jwt_token'); // Recupera el token guardado
+  
+    if (token != null) {
+      try {
+        final response = await http.get(
+          Uri.parse('${dotenv.env['API_BASE_URL']}/obtener_rol'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json'
+          },
+        );
+  
+        if (response.statusCode == 200) {
+          final decodedData = json.decode(response.body);
+          setState(() {
+            userRole = decodedData['rol']; // Almacena el rol del usuario
+            print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa${userRole}");
+          });
+  
+          // Guarda el rol en SharedPreferences
+          await prefs.setString('user_role', userRole!);
+        } else if (response.statusCode == 404) {
+          setState(() {
+            data = 'Usuario no encontrado';
+          });
+        } else {
+          setState(() {
+            data = 'Error al obtener los datos: ${response.statusCode}';
+          });
+        }
+      } catch (e) {
+        setState(() {
+          data = 'Error al realizar la solicitud: $e';
+        });
+      }
+    } else {
+      setState(() {
+        data = 'Token no disponible';
+      });
+    }
+  }
 
   // Función para hacer la solicitud GET al backend
   Future<void> fetchData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    final token = await prefs.getString('jwt_token'); // Recupera el token guardado
+    final token =
+        await prefs.getString('jwt_token'); // Recupera el token guardado
 
     if (token != null) {
       try {
@@ -59,8 +105,10 @@ class _HomeScreenState extends State<HomeScreen> {
           });
 
           // Llama al servicio de imagen y establece la URL de la imagen
-          final profileImageService = Provider.of<ProfileImageService>(context, listen: false);
-          profileImageService.setImageUrl(decodedData['foto_url'] ?? 'assets/avatar.png');
+          final profileImageService =
+              Provider.of<ProfileImageService>(context, listen: false);
+          profileImageService.setImageUrl(
+              decodedData['data']['foto_url'] ?? 'assets/avatar.png');
         } else if (response.statusCode == 404) {
           setState(() {
             data = 'Usuario no encontrado';
@@ -85,7 +133,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> fetchAllData() async {
     await Future.wait([
       fetchData(),
-      Provider.of<ProfileImageService>(context, listen: false).fetchProfileImage(),
+      fetchRol(),
+      Provider.of<ProfileImageService>(context, listen: false)
+          .fetchProfileImage(),
     ]);
   }
 
@@ -120,23 +170,28 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         child: BottomNavigationBar(
-          items: const [
-            BottomNavigationBarItem(
+          items: [
+            const BottomNavigationBarItem(
               icon: Icon(Icons.home),
               label: 'Inicio',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.place),
               label: 'Destinos',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.book),
               label: 'Reservas',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.local_offer),
               label: 'Promociones',
             ),
+            if (userRole == 'empresa')
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.people),
+                label: 'Clientes',
+              ),
           ],
           currentIndex: _selectedIndex,
           selectedItemColor:
