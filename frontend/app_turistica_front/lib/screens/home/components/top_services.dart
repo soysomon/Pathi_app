@@ -1,7 +1,66 @@
-import 'package:flutter/material.dart';
+// top_services.dart
 
-class TopServices extends StatelessWidget {
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shimmer/shimmer.dart';
+
+List<Service> allServices = [];
+
+class TopServices extends StatefulWidget {
   const TopServices({Key? key}) : super(key: key);
+
+  @override
+  _TopServicesState createState() => _TopServicesState();
+}
+
+class _TopServicesState extends State<TopServices> {
+  List<Service> topServices = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchServices();
+  }
+
+  Future<void> _fetchServices() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('jwt_token');
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Token no disponible, inicia sesión nuevamente')),
+      );
+      return;
+    }
+
+    try {
+      final uri = Uri.parse('${dotenv.env['API_BASE_URL']}/servicios');
+      final response = await http.get(uri, headers: {
+        'Authorization': 'Bearer $token',
+      });
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        setState(() {
+          topServices = data.map((service) => Service.fromJson(service)).toList();
+          allServices = topServices; // Exponer los servicios globalmente
+          isLoading = false;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al obtener los servicios')),
+        );
+      }
+    } catch (e) {
+      print('Error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error de conexión al servidor')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,13 +79,90 @@ class TopServices extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: NeverScrollableScrollPhysics(),
-          itemCount: topServices.length,
-          itemBuilder: (context, index) => TopServiceCard(service: topServices[index]),
-        ),
+        isLoading
+            ? ListView.builder(
+                shrinkWrap: true,
+                physics: NeverScrollableScrollPhysics(),
+                itemCount: 2, // Número de esqueletos a mostrar
+                itemBuilder: (context, index) => Shimmer.fromColors(
+                  baseColor: Colors.grey[300]!,
+                  highlightColor: Colors.grey[100]!,
+                  child: SkeletonTopServiceCard(),
+                ),
+              )
+            : ListView.builder(
+                shrinkWrap: true,
+                physics: NeverScrollableScrollPhysics(),
+                itemCount: topServices.length,
+                itemBuilder: (context, index) => TopServiceCard(service: topServices[index]),
+              ),
       ],
+    );
+  }
+}
+
+class SkeletonTopServiceCard extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Card(
+        color: const Color.fromARGB(255, 255, 255, 255),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+        ),
+        elevation: 5,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            children: [
+              Flexible(
+                flex: 1,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: 130,
+                    height: 90,
+                    color: Colors.grey[300],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 20),
+              Flexible(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      height: 16,
+                      color: Colors.grey[300],
+                    ),
+                    const SizedBox(height: 5),
+                    Container(
+                      width: double.infinity,
+                      height: 14,
+                      color: Colors.grey[300],
+                    ),
+                    const SizedBox(height: 5),
+                    Container(
+                      width: double.infinity,
+                      height: 14,
+                      color: Colors.grey[300],
+                    ),
+                    const SizedBox(height: 5),
+                    Container(
+                      width: 50,
+                      height: 16,
+                      color: Colors.grey[300],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -53,17 +189,21 @@ class TopServiceCard extends StatelessWidget {
           padding: const EdgeInsets.all(10),
           child: Row(
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.asset(
-                  service.image,
-                  width: 130,
-                  height: 90,
-                  fit: BoxFit.cover,
+              Flexible(
+                flex: 1,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(
+                    service.image,
+                    width: 130,
+                    height: 90,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
               const SizedBox(width: 20),
-              Expanded(
+              Flexible(
+                flex: 2,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -76,7 +216,7 @@ class TopServiceCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      service.location,
+                      service.description,
                       style: const TextStyle(
                         fontSize: 14,
                         color: Colors.grey,
@@ -91,16 +231,6 @@ class TopServiceCard extends StatelessWidget {
                         color: Colors.green,
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Row(
-                      children: List.generate(5, (index) {
-                        return Icon(
-                          index < service.rating ? Icons.star : Icons.star_border,
-                          color: Colors.amber,
-                          size: 16,
-                        );
-                      }),
-                    ),
                   ],
                 ),
               ),
@@ -113,39 +243,22 @@ class TopServiceCard extends StatelessWidget {
 }
 
 class Service {
-  final String title, image, location;
+  final String title, description, image;
   final double price;
-  final int rating;
 
   Service({
     required this.title,
+    required this.description,
     required this.image,
-    required this.location,
     required this.price,
-    required this.rating,
   });
-}
 
-final List<Service> topServices = [
-  Service(
-    title: "Tour por la ciudad",
-    image: "assets/4.jpg",
-    location: "Centro, Ciudad",
-    price: 50.0,
-    rating: 4,
-  ),
-  Service(
-    title: "Excursión a la montaña",
-    image: "assets/5.jpg",
-    location: "Montañas, Ciudad",
-    price: 75.0,
-    rating: 5,
-  ),
-  Service(
-    title: "Visita al museo",
-    image: "assets/7.jpg",
-    location: "Museo, Ciudad",
-    price: 30.0,
-    rating: 4,
-  ),
-];
+  factory Service.fromJson(Map<String, dynamic> json) {
+    return Service(
+      title: json['nombre'],
+      description: json['descripcion'],
+      image: json['imagen_servicio'] != null ? '${dotenv.env['API_BASE_URL']}/${json['imagen_servicio']}' : 'assets/default_image.jpg',
+      price: double.parse(json['precio'].toString()),
+    );
+  }
+}
