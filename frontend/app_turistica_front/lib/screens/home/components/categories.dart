@@ -13,16 +13,16 @@ class _CategoriesState extends State<Categories> {
     {"icon": Icons.all_inclusive, "text": "Todo"},
     {"icon": Icons.star, "text": "Popular"},
     {"icon": Icons.location_on, "text": "Cercano"},
-    {"icon": Icons.thumb_up, "text": "Recomendado"},
+    {"icon": Icons.thumb_up, "text": "Sugerido"},
   ];
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(top: 20), // Añade margen superior
-      width: double.infinity, // Ocupa todo el ancho de la pantalla
+      margin: const EdgeInsets.only(top: 20),
+      width: double.infinity,
       child: SizedBox(
-        height: 100,
+        height: 150,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           itemCount: categories.length,
@@ -40,33 +40,42 @@ class _CategoriesState extends State<Categories> {
         });
       },
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 19), // Añade espacio horizontal entre categorías
+        margin: const EdgeInsets.symmetric(horizontal: 16), // Aumenta el espacio entre categorías
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               padding: const EdgeInsets.all(16),
-              height: 56,
-              width: 56,
+              height: 70,
+              width: 70,
               decoration: BoxDecoration(
-                color: selectedIndex == index
-                    ? const Color(0xFFFFECDF)
-                    : const Color(0xFFF5F6F9),
+                color: selectedIndex == index ? const Color(0xFF47DCB6) : Colors.white,
+                shape: BoxShape.rectangle,
                 borderRadius: BorderRadius.circular(10),
-                border: selectedIndex == index
-                    ? Border.all(color: Colors.orange, width: 2)
-                    : null,
+                boxShadow: [
+                  BoxShadow(
+                    color: selectedIndex == index
+                        ? const Color(0xFF47DCB6).withOpacity(0.5)
+                        : Colors.black.withOpacity(0.1),
+                    spreadRadius: 3,
+                    blurRadius: 5,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
               child: Icon(
                 categories[index]["icon"],
-                color: selectedIndex == index ? Colors.orange : Colors.black,
+                color: selectedIndex == index ? Colors.white : Colors.black,
+                size: 30,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 10),
             Text(
               categories[index]["text"]!,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: selectedIndex == index ? Colors.orange : Colors.black,
+                color: selectedIndex == index ? const Color(0xFF47DCB6) : Colors.black,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
