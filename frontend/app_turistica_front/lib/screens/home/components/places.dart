@@ -1,13 +1,55 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_rating_bar/flutter_rating_bar.dart';
-import '../../service/service_screen.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 
+import '../../service/service_screen.dart';
 import 'section_title.dart';
 
-class Places extends StatelessWidget {
-  const Places({
-    Key? key,
-  }) : super(key: key);
+class Places extends StatefulWidget {
+  const Places({Key? key}) : super(key: key);
+
+  @override
+  _PlacesState createState() => _PlacesState();
+}
+
+class _PlacesState extends State<Places> {
+  List<dynamic> topUsers = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchTopUsers();
+  }
+
+  Future<void> fetchTopUsers() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString('jwt_token');
+
+    if (token == null) {
+      throw Exception('Token not found');
+    }
+
+    final response = await http.get(
+      Uri.parse('${dotenv.env['API_BASE_URL']}/usuarios/top-reservas'),
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      setState(() {
+        topUsers = json.decode(response.body);
+        isLoading = false;
+      });
+    } else {
+      throw Exception('Failed to load top users');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,30 +67,49 @@ class Places extends StatelessWidget {
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
-            children: [
-              BusinessCard(
-                image: "assets/images/Image Banner 2.png",
-                name: "Restaurante El Buen Sabor",
-                rating: 4.5,
-                location: "Calle 123, Ciudad",
-                press: () {
-                  Navigator.pushNamed(context, ServicesScreen.routeName);
-                },
-              ),
-              BusinessCard(
-                image: "assets/images/Image Banner 3.png",
-                name: "Hotel Paraíso",
-                rating: 4.0,
-                location: "Avenida 456, Ciudad",
-                press: () {
-                  Navigator.pushNamed(context, ServicesScreen.routeName);
-                },
-              ),
-              const SizedBox(width: 20),
-            ],
+            children: isLoading
+                ? List.generate(3, (index) => const SkeletonBusinessCard())
+                : topUsers.map((user) {
+                    String imageUrl = user['foto_url'] != null
+                        ? '${dotenv.env['API_BASE_URL']}/${user['imagen_empresarial']}'
+                        : "assets/images/default_image.png";
+                    return BusinessCard(
+                      image: imageUrl,
+                      name: user['nombre_usuario'],
+                      location: user['ubicacion'] ?? 'Ubicación no disponible',
+                      press: () {
+                        Navigator.pushNamed(context, ServicesScreen.routeName);
+                      },
+                    );
+                  }).toList(),
           ),
         ),
       ],
+    );
+  }
+}
+
+class SkeletonBusinessCard extends StatelessWidget {
+  const SkeletonBusinessCard({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 20),
+      child: SizedBox(
+        width: 242,
+        height: 120,
+        child: Shimmer.fromColors(
+          baseColor: Colors.grey[300]!,
+          highlightColor: Colors.grey[100]!,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              color: Colors.grey[300],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -58,13 +119,11 @@ class BusinessCard extends StatelessWidget {
     Key? key,
     required this.name,
     required this.image,
-    required this.rating,
     required this.location,
     required this.press,
   }) : super(key: key);
 
   final String name, image, location;
-  final double rating;
   final GestureTapCallback press;
 
   @override
@@ -80,11 +139,19 @@ class BusinessCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             child: Stack(
               children: [
-                Image.asset(
-                  image,
+                CachedNetworkImage(
+                  imageUrl: image,
                   fit: BoxFit.cover,
                   width: double.infinity,
                   height: double.infinity,
+                  placeholder: (context, url) => Shimmer.fromColors(
+                    baseColor: Colors.grey[300]!,
+                    highlightColor: Colors.grey[100]!,
+                    child: Container(
+                      color: Colors.grey[300],
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Image.asset('assets/images/default_image.png'),
                 ),
                 Container(
                   decoration: const BoxDecoration(
@@ -121,17 +188,6 @@ class BusinessCard extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          const SizedBox(width: 5),
-                          RatingBarIndicator(
-                            rating: rating,
-                            itemBuilder: (context, index) => const Icon(
-                              Icons.star,
-                              color: Colors.amber,
-                            ),
-                            itemCount: 5,
-                            itemSize: 20.0,
-                            direction: Axis.horizontal,
                           ),
                         ],
                       ),
