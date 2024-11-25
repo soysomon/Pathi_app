@@ -1,48 +1,53 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-
-import '../../../constants.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shimmer/shimmer.dart';
 
 class IconBtnWithCounter extends StatelessWidget {
   const IconBtnWithCounter({
     Key? key,
-    required this.svgSrc,
-    this.numOfitem = 0,
     required this.press,
+    this.profileImage,
   }) : super(key: key);
 
-  final String svgSrc;
-  final int numOfitem;
-  final GestureTapCallback press;
+  final VoidCallback press;
+  final String? profileImage;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(100),
+    return GestureDetector(
       onTap: press,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            height: 46,
-            width: 46,
-            decoration: BoxDecoration(
-              color: kSecondaryColor.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: SvgPicture.asset(svgSrc),
-          ),
-          Container(
-            padding: const EdgeInsets.all(12),
-            height: 46,
-            width: 46,
-            decoration: BoxDecoration(
-              color: kSecondaryColor.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: SvgPicture.asset(svgSrc),
-          ),
+          profileImage != null
+              ? CircleAvatar(
+                  radius: 30,
+                  backgroundImage: CachedNetworkImageProvider(profileImage!),
+                  child: CachedNetworkImage(
+                    imageUrl: profileImage!,
+                    placeholder: (context, url) => Shimmer.fromColors(
+                      baseColor: Colors.grey[300]!,
+                      highlightColor: Colors.grey[100]!,
+                      child: CircleAvatar(
+                        radius: 30,
+                        backgroundColor: Colors.grey[300],
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Icon(Icons.error),
+                    imageBuilder: (context, imageProvider) => CircleAvatar(
+                      radius: 30,
+                      backgroundImage: imageProvider,
+                    ),
+                  ),
+                )
+              : Shimmer.fromColors(
+                  baseColor: Colors.grey[300]!,
+                  highlightColor: Colors.grey[100]!,
+                  child: CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.grey[300],
+                  ),
+                ),
         ],
       ),
     );
