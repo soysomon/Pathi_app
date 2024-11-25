@@ -1,125 +1,97 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:intl/intl.dart';
 
 class ReservationCard extends StatelessWidget {
   const ReservationCard({
     Key? key,
-    required this.name,
+    required this.reservationName,
+    required this.reservationEmail,
+    required this.reservationPhone,
+    required this.reservationTime,
+    required this.reservationDate,
+    required this.totalPayment,
+    required this.userName,
+    required this.userLocation,
+    required this.userDetails,
     required this.image,
-    required this.rating,
-    required this.location,
-    required this.date,
-    required this.time,
+    required this.onCancel,
   }) : super(key: key);
 
-  final String name, image, location, date, time;
-  final double rating;
+  final String reservationName, reservationEmail, reservationPhone, reservationTime, reservationDate, totalPayment;
+  final String userName, userLocation, userDetails, image;
+  final VoidCallback onCancel;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: SizedBox(
-        width: double.infinity,
-        height: 150,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
-            children: [
-              Image.asset(
-                image,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-              ),
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black54,
-                      Colors.black38,
-                      Colors.black26,
-                      Colors.transparent,
-                    ],
-                  ),
+    final DateTime parsedDate = DateTime.parse(reservationDate);
+    final String formattedDate = DateFormat('dd/MM/yyyy').format(parsedDate);
+
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      elevation: 5,
+      child: Container(
+        width: double.infinity, // Make the card take the full width
+        child: Row(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 10), // Added padding to the left of the image
+              child: ClipRRect(
+                borderRadius: BorderRadius.horizontal(left: Radius.circular(20)),
+                child: CachedNetworkImage(
+                  imageUrl: image.isNotEmpty
+                      ? '${dotenv.env['API_BASE_URL']}/$image'
+                      : 'assets/images/default_image.png',
+                  fit: BoxFit.cover,
+                  width: 100, // Adjusted width of the image
+                  height: 100, // Adjusted height of the image
+                  errorWidget: (context, url, error) => Icon(Icons.error),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 15,
-                  vertical: 10,
-                ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(10), // Adjusted padding to make card more compact
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text(
+                      userName,
+                      style: const TextStyle(
+                        fontSize: 18, // Adjusted font size to make card more compact
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 15), // Adjusted spacing to make card more compact
+                    const SizedBox(height: 5), // Adjusted spacing to make card more compact
                     Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                          child: ElevatedButton(
+                            onPressed: () => _showDetails(context, formattedDate),
+                            style: ElevatedButton.styleFrom(
+                              foregroundColor: Colors.white, backgroundColor: Colors.black,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 5),
-                        Expanded(
-                          child: Text(
-                            location,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.calendar_today,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          date,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
+                            child: const Text('Detalles'),
                           ),
                         ),
                         const SizedBox(width: 10),
-                        const Icon(
-                          Icons.access_time,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          time,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: onCancel,
+                            style: ElevatedButton.styleFrom(
+                              foregroundColor: Colors.white, backgroundColor: Colors.red,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: const Text('Cancelar'),
                           ),
                         ),
                       ],
@@ -127,9 +99,82 @@ class ReservationCard extends StatelessWidget {
                   ],
                 ),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDetails(BuildContext context, String formattedDate) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.black87,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 50,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildInfoRow(Icons.phone, 'Teléfono', _formatPhoneNumber(reservationPhone)),
+              _buildInfoRow(Icons.calendar_today, 'Fecha', formattedDate),
+              _buildInfoRow(Icons.access_time, 'Hora', _formatTimeTo12Hour(reservationTime)),
+              _buildInfoRow(Icons.attach_money, 'Pagado', totalPayment),
+              _buildInfoRow(Icons.location_on, 'Ubicación', userLocation), // Agregar esta línea
             ],
           ),
-        ),
+        );
+      },
+    );
+  }
+
+  String _formatPhoneNumber(String phoneNumber) {
+    if (phoneNumber.length == 10) {
+      return '${phoneNumber.substring(0, 3)}-${phoneNumber.substring(3, 6)}-${phoneNumber.substring(6, 10)}';
+    }
+    return phoneNumber;
+  }
+
+  String _formatTimeTo12Hour(String time) {
+    final DateFormat inputFormat = DateFormat('HH:mm');
+    final DateFormat outputFormat = DateFormat('hh:mm a');
+    final DateTime dateTime = inputFormat.parse(time);
+    return outputFormat.format(dateTime);
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10), // Aumenta el espaciado vertical
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white, size: 28), // Ajusta el tamaño del icono
+          const SizedBox(width: 15), // Aumenta el espaciado horizontal
+          Expanded(
+            child: Text(
+              '$label: $value',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18, // Ajusta el tamaño de la fuente
+                fontWeight: FontWeight.w600, // Ajusta el estilo de la fuente
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
