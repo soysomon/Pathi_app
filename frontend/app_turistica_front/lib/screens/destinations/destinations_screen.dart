@@ -1,21 +1,45 @@
 import 'package:app_turistica_front/screens/destinations/components/business_card.dart';
-import 'package:app_turistica_front/screens/destinations/components/services.dart';
 import 'package:flutter/material.dart';
-import 'components/destinations_header.dart'; // Asegúrate de importar el archivo correcto
+import 'components/destinations_header.dart';
 
-class DestinationsScreen extends StatelessWidget {
+class DestinationsScreen extends StatefulWidget {
   static String routeName = "/destinations";
+
+  @override
+  _DestinationsScreenState createState() => _DestinationsScreenState();
+}
+
+class _DestinationsScreenState extends State<DestinationsScreen> {
+  List<dynamic> searchResults = [];
+
+  void updateSearchResults(List<dynamic> results) {
+    setState(() {
+      searchResults = results;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: DestinationsContent(),
+      body: DestinationsContent(
+        searchResults: searchResults,
+        onSearchResults: updateSearchResults,
+      ),
     );
   }
 }
 
 // Contenido de la pantalla de inicio
 class DestinationsContent extends StatelessWidget {
+    final List<dynamic> searchResults;
+  final Function(List<dynamic>) onSearchResults;
+
+  const DestinationsContent({
+    Key? key,
+    required this.searchResults,
+    required this.onSearchResults,
+  }) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -23,11 +47,9 @@ class DestinationsContent extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 16),
         child: Column(
           children: [
-            const DestinationsHeader(),
+            DestinationsHeader(onSearchResults: onSearchResults),
             const SizedBox(height: 20),
-            const Services(),
-            const SizedBox(height: 20),
-            DestinationsCard(), // 
+            DestinationsCard(searchResults: searchResults),
           ],
         ),
       ),
