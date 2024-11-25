@@ -1,5 +1,7 @@
 import 'package:app_turistica_front/screens/helpcenter/help_center.dart';
+import 'package:app_turistica_front/screens/loading/loading_screen.dart';
 import 'package:app_turistica_front/screens/profile/profile_screen.dart';
+import 'package:app_turistica_front/services/profile_image_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../screens/home/home_screen.dart';
@@ -20,12 +22,20 @@ void main() async {
   if (token == null) {
     await prefs.clear();
   }
+  
 
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeService(),
-      child: MyApp(initialRoute: token == null ? '/login' : '/home'),
-    ),
+    MultiProvider(
+      providers:[ 
+      ChangeNotifierProvider(
+       create: (_) => ThemeService(),
+      ),
+      ChangeNotifierProvider(
+       create: (_) => ProfileImageService(),
+      ),
+    ],
+    child: MyApp(initialRoute: token == null ? '/login' : '/home'),
+  ) 
   );
 }
 
@@ -49,6 +59,7 @@ class MyApp extends StatelessWidget {
         '/register': (context) => const RegisterScreen(),
         '/profile': (context) => const ProfileScreen(),  
         '/helpcenter': (context) => const HelpCenter(),
+        '/loading': (context) => const LoadingScreen(),
       },
     );
   }
