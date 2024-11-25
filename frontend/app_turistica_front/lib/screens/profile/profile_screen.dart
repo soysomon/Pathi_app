@@ -34,19 +34,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   File? _imageFile; // Archivo de imagen seleccionado
   bool isDarkMode = false; // Estado del modo oscuro
   bool _isProfileDataLoaded = false; // Controla si los datos del perfil ya han sido cargados
+  String? userRole; // Rol del usuario
 
   final TextEditingController _nombreUsuarioController = TextEditingController();
   final TextEditingController _emailController = TextEditingController(); // Para editar el email
 
   final PublicarService publicarService = PublicarService();
   bool isPublico = false;
-
-  // Función para alternar el modo oscuro
-  void _toggleDarkMode(bool value) {
-    setState(() {
-      isDarkMode = value;
-    });
-  }
 
   Future<void> _fetchProfileData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -69,6 +63,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             nombreUsuario = data['nombre_usuario'] ?? '';
             email = data['email'] ?? 'email@dominio.com';
             imageUrl = data['foto_url'] ?? 'assets/avatar.png';
+            userRole = data['rol']; // Asigna el rol del usuario
             _nombreUsuarioController.text = nombreUsuario; // Inicializa campo de texto
             _emailController.text = email; // Inicializa el campo de email
             Provider.of<ProfileImageService>(context, listen: false).setImageUrl(imageUrl);
@@ -183,6 +178,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> logout() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+    await prefs.remove('user_role');
     print('Token eliminado');
     Navigator.pushReplacementNamed(context, '/login');
   }
@@ -247,6 +243,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<String> _getUserId() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_id') ?? '';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -274,102 +275,226 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              ProfilePic(
-                name: nombreUsuario,
-                email: email,
-                imagePath: getProfileImagePath(),
-                onImageTap: _showImagePickerOptions,
-                onEditTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return EditProfileDialog(
-                        nombreUsuarioController: _nombreUsuarioController,
-                        emailController: _emailController,
-                        onUpdateProfile: _updateProfile,
+          child: FutureBuilder<String>(
+            future: _getUserId(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return CircularProgressIndicator();
+              } else if (snapshot.hasError) {
+                return Text('Error: ${snapshot.error}');
+              } else {
+                final userId = snapshot.data ?? '';
+                if (userRole == 'empresa') {
+                  return NonTuristaProfile(
+                    nombreUsuario: nombreUsuario,
+                    email: email,
+                    imagePath: getProfileImagePath(),
+                    onImageTap: _showImagePickerOptions,
+                    onEditTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return EditProfileDialog(
+                            nombreUsuarioController: _nombreUsuarioController,
+                            emailController: _emailController,
+                            onUpdateProfile: _updateProfile,
+                          );
+                        },
+                      );
+                    },
+                    onLogout: () async {
+                      Provider.of<ProfileImageService>(context, listen: false).clearImageUrl();
+                      await logout();
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => LoginScreen()), // Regresa a HomeScreen, no al login
+                      );
+                    },
+                    isPublico: isPublico,
+                    userId: userId,
+                  );
+                } else {
+                  return TuristaProfile(
+                    nombreUsuario: nombreUsuario,
+                    email: email,
+                    imagePath: getProfileImagePath(),
+                    onImageTap: _showImagePickerOptions,
+                    onEditTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return EditProfileDialog(
+                            nombreUsuarioController: _nombreUsuarioController,
+                            emailController: _emailController,
+                            onUpdateProfile: _updateProfile,
+                          );
+                        },
+                      );
+                    },
+                    onLogout: () async {
+                      Provider.of<ProfileImageService>(context, listen: false).clearImageUrl();
+                      await logout();
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => LoginScreen()), // Regresa a HomeScreen, no al login
                       );
                     },
                   );
-                },
-              ),
-              const SizedBox(height: 20),
-              FutureBuilder<String?>(
-                future: SharedPreferences.getInstance().then((prefs) => prefs.getString('user_id')),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return CircularProgressIndicator();
-                  } else if (snapshot.hasError) {
-                    return Text('Error: ${snapshot.error}');
-                  } else {
-                    return MostrarCompaniaSwitch(
-                      isPublico: isPublico,
-                      userId: snapshot.data ?? '',
-                    );
-                  }
-                },
-              ),
-              ProfileMenu(
-                text: "Publicar Perfil",
-                icon: "assets/icons/User.svg", // Icono de usuario
-                press: () {
-                  showDialog(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return PublishProfile();
-                    },
-                  );
-                },
-              ),
-              ProfileMenu(
-                text: "Publicar Promoción",
-                icon: "assets/icons/Cart Icon.svg", // Icono de etiqueta
-                press: () {
-                  showDialog(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return PromotionsDialog();
-                    },
-                  );
-                },
-              ),
-              ProfileMenu(
-                text: "Publicar Servicio",
-                icon: "assets/icons/Plus Icon.svg", // Icono de servicio
-                press: () {
-                  showDialog(
-                    context: context,
-                    builder: (BuildContext context) {
-                      return AddServiceDialog();
-                    },
-                  );
-                },
-              ),
-              ProfileMenu(
-                text: "Help Center",
-                icon: "assets/icons/Question mark.svg",
-                press: () {
-                  Navigator.pushNamed(context, HelpCenter.routeName);
-                },
-              ),
-              ProfileMenu(
-                text: "Log Out",
-                icon: "assets/icons/Log out.svg",
-                press: () async {
-                  Provider.of<ProfileImageService>(context, listen: false).clearImageUrl();
-                  await logout();
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => LoginScreen()), // Regresa a HomeScreen, no al login
-                  );
-                },
-              ),
-            ],
+                }
+              }
+            },
           ),
         ),
       ),
+    );
+  }
+}
+
+class TuristaProfile extends StatelessWidget {
+  final String nombreUsuario;
+  final String email;
+  final String imagePath;
+  final VoidCallback onImageTap;
+  final VoidCallback onEditTap;
+  final VoidCallback onLogout;
+
+  const TuristaProfile({
+    required this.nombreUsuario,
+    required this.email,
+    required this.imagePath,
+    required this.onImageTap,
+    required this.onEditTap,
+    required this.onLogout,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        ProfilePic(
+          name: nombreUsuario,
+          email: email,
+          imagePath: imagePath,
+          onImageTap: onImageTap,
+          onEditTap: onEditTap,
+        ),
+        const SizedBox(height: 20),
+        ProfileMenu(
+          text: "Help Center",
+          icon: "assets/icons/Question mark.svg",
+          press: () {
+            Navigator.pushNamed(context, HelpCenter.routeName);
+          },
+        ),
+        ProfileMenu(
+          text: "Log Out",
+          icon: "assets/icons/Log out.svg",
+          press: onLogout,
+        ),
+      ],
+    );
+  }
+}
+
+class NonTuristaProfile extends StatelessWidget {
+  final String nombreUsuario;
+  final String email;
+  final String imagePath;
+  final VoidCallback onImageTap;
+  final VoidCallback onEditTap;
+  final VoidCallback onLogout;
+  final bool isPublico;
+  final String userId;
+
+  const NonTuristaProfile({
+    required this.nombreUsuario,
+    required this.email,
+    required this.imagePath,
+    required this.onImageTap,
+    required this.onEditTap,
+    required this.onLogout,
+    required this.isPublico,
+    required this.userId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        ProfilePic(
+          name: nombreUsuario,
+          email: email,
+          imagePath: imagePath,
+          onImageTap: onImageTap,
+          onEditTap: onEditTap,
+        ),
+        const SizedBox(height: 20),
+        FutureBuilder<String?>(
+          future: SharedPreferences.getInstance().then((prefs) => prefs.getString('user_id')),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return CircularProgressIndicator();
+            } else if (snapshot.hasError) {
+              return Text('Error: ${snapshot.error}');
+            } else {
+              return MostrarCompaniaSwitch(
+                isPublico: isPublico,
+                userId: snapshot.data ?? '',
+              );
+            }
+          },
+        ),
+        ProfileMenu(
+          text: "Publicar Perfil",
+          icon: "assets/icons/User.svg", // Icono de usuario
+          press: () {
+            showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return PublishProfile();
+              },
+            );
+          },
+        ),
+        ProfileMenu(
+          text: "Publicar Promoción",
+          icon: "assets/icons/Cart Icon.svg", // Icono de etiqueta
+          press: () {
+            showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return PromotionsDialog();
+              },
+            );
+          },
+        ),
+        ProfileMenu(
+          text: "Publicar Servicio",
+          icon: "assets/icons/Plus Icon.svg", // Icono de servicio
+          press: () {
+            showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return AddServiceDialog();
+              },
+            );
+          },
+        ),
+        ProfileMenu(
+          text: "Help Center",
+          icon: "assets/icons/Question mark.svg",
+          press: () {
+            Navigator.pushNamed(context, HelpCenter.routeName);
+          },
+        ),
+        ProfileMenu(
+          text: "Log Out",
+          icon: "assets/icons/Log out.svg",
+          press: onLogout,
+        ),
+      ],
     );
   }
 }
