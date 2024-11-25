@@ -3,14 +3,18 @@ import 'package:app_turistica_front/screens/promotions/promotions_screen.dart';
 import 'package:app_turistica_front/screens/reservations/reservations_screen.dart';
 import 'package:app_turistica_front/screens/home/components/top_services.dart';
 import 'package:flutter/material.dart' hide CarouselController;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 
 // Importa la pantalla de perfil
 import '../profile/profile_screen.dart';
 import 'components/categories.dart';
 import 'components/home_header.dart';
 import 'components/places.dart';
+import 'package:app_turistica_front/services/profile_image_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -35,18 +39,54 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Función para hacer la solicitud GET al backend
   Future<void> fetchData() async {
-    final response = await http.get(Uri.parse('http://192.168.50.251:3000/'));
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final token = await prefs.getString('jwt_token'); // Recupera el token guardado
 
-    if (response.statusCode == 200) {
-      final decodedData = json.decode(response.body);
-      setState(() {
-        data = decodedData['message'];
-      });
+    if (token != null) {
+      try {
+        final response = await http.get(
+          Uri.parse('${dotenv.env['API_BASE_URL']}/perfil'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json'
+          },
+        );
+
+        if (response.statusCode == 200) {
+          final decodedData = json.decode(response.body);
+          setState(() {
+            data = decodedData['message'];
+          });
+
+          // Llama al servicio de imagen y establece la URL de la imagen
+          final profileImageService = Provider.of<ProfileImageService>(context, listen: false);
+          profileImageService.setImageUrl(decodedData['foto_url'] ?? 'assets/avatar.png');
+        } else if (response.statusCode == 404) {
+          setState(() {
+            data = 'Usuario no encontrado';
+          });
+        } else {
+          setState(() {
+            data = 'Error al obtener los datos: ${response.statusCode}';
+          });
+        }
+      } catch (e) {
+        setState(() {
+          data = 'Error al realizar la solicitud: $e';
+        });
+      }
     } else {
       setState(() {
-        data = 'Error al cargar los datos';
+        data = 'Token no disponible';
       });
     }
+  }
+
+  Future<void> fetchAllData() async {
+    await Future.wait([
+      fetchData(),
+      Provider.of<ProfileImageService>(context, listen: false).fetchProfileImage(),
+    ]);
   }
 
   void _onItemTapped(int index) {
@@ -58,7 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    fetchData();
+    fetchAllData();
   }
 
   @override
