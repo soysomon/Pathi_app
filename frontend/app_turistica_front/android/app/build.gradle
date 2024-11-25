@@ -56,3 +56,9 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    implementation 'io.card:android-sdk:5.+'
+    implementation 'com.google.android.gms:play-services-wallet:19.4.0'
+
+}
