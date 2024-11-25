@@ -26,6 +26,16 @@ dependencies:
   flutter_rating_bar: ^4.0.0
   provider: ^6.1.2
   flutter_dotenv: ^5.0.2
+  intl: ^0.17.0
+  shimmer: ^2.0.0
+  flutter_paypal: ^0.0.1
+  paypal_sdk: ^1.0.9
+  flutter_paypal_checkout: ^1.0.1
+  flutter_braintree: ^4.0.0
+  intl_phone_field: ^3.0.1
+  geolocator: ^9.0.0
+  flutter_map: ^4.0.0
+  latlong2: ^0.8.2
 
 
 dev_dependencies:
