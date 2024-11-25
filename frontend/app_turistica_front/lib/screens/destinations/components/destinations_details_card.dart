@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'destinations_card_services.dart'; // Importa la nueva vista
+import 'reservation_dialog.dart'; // Importa el nuevo diálogo de reservaciones
 
 class DestinationDetailsCard extends StatelessWidget {
   final Map<String, dynamic> destination;
+  final int destinationId;
 
-  const DestinationDetailsCard({Key? key, required this.destination}) : super(key: key);
+  const DestinationDetailsCard(
+      {Key? key, required this.destination, required this.destinationId})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -29,9 +35,15 @@ class DestinationDetailsCard extends StatelessWidget {
           children: [
             // Imagen en la parte inferior
             Positioned.fill(
-              child: Image.asset(
-                destination['image'],
+              child: CachedNetworkImage(
+                imageUrl: destination['imagen_empresarial'] != null
+                    ? '${dotenv.env['API_BASE_URL']}/${destination['imagen_empresarial']}'
+                    : '',
                 fit: BoxFit.cover,
+                placeholder: (context, url) => Center(
+                  child: CircularProgressIndicator(),
+                ),
+                errorWidget: (context, url, error) => const Icon(Icons.error),
               ),
             ),
             // Degradado
@@ -69,7 +81,7 @@ class DestinationDetailsCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    destination['name'],
+                    destination['nombre_usuario'],
                     style: const TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
@@ -94,7 +106,7 @@ class DestinationDetailsCard extends StatelessWidget {
                       const SizedBox(width: 5),
                       Expanded(
                         child: Text(
-                          destination['location'],
+                          destination['ubicacion'],
                           style: const TextStyle(
                             fontSize: 16,
                             color: Colors.white70,
@@ -104,21 +116,11 @@ class DestinationDetailsCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  RatingBarIndicator(
-                    rating: destination['rating'],
-                    itemBuilder: (context, index) => const Icon(
-                      Icons.star,
-                      color: Colors.amber,
-                    ),
-                    itemCount: 5,
-                    itemSize: 20.0,
-                    direction: Axis.horizontal,
-                  ),
                   const SizedBox(height: 20),
                   Expanded(
                     child: SingleChildScrollView(
                       child: Text(
-                        destination['serviceDetails'],
+                        destination['detalles'],
                         style: const TextStyle(
                           fontSize: 16,
                           color: Colors.white70,
@@ -133,7 +135,8 @@ class DestinationDetailsCard extends StatelessWidget {
                       OutlinedButton(
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(color: Colors.blueAccent, width: 2),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 10),
                           textStyle: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -141,20 +144,27 @@ class DestinationDetailsCard extends StatelessWidget {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          backgroundColor: Colors.white,
+                          backgroundColor: const Color.fromARGB(255, 39, 37, 37),
                         ),
                         onPressed: () {
-                          // Acción para el botón de servicios
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DestinationServices(
+                                  destinationId: destinationId),
+                            ),
+                          );
                         },
                         child: const Text(
                           'Servicios',
-                          style: TextStyle(color: Colors.black),
+                          style: TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
                         ),
                       ),
                       OutlinedButton(
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(color: Colors.greenAccent, width: 2),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 45, vertical: 10),
                           textStyle: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -162,14 +172,19 @@ class DestinationDetailsCard extends StatelessWidget {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          backgroundColor: Colors.white,
+                          backgroundColor: const Color.fromARGB(255, 39, 37, 37),
                         ),
                         onPressed: () {
-                          // Acción para el botón de reservar
+                          showDialog(
+                            context: context,
+                            builder: (BuildContext context) {
+                              return ReservationDialog(destinationId: destinationId);
+                            },
+                          );
                         },
                         child: const Text(
                           'Reservar',
-                          style: TextStyle(color: Colors.black),
+                          style: TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
                         ),
                       ),
                     ],
