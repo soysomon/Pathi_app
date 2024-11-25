@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
@@ -7,6 +8,7 @@ const path = require('path');
 const fs = require('fs');
 const pool = require('./db'); // Importar la conexión de la base de datos
 const cors = require('cors');
+const braintree = require('braintree');
 
 const app = express();
 const port = 3000;
@@ -42,7 +44,12 @@ function authenticateToken(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, 'secret_key');
-    req.user = decoded; // Adjuntar el usuario decodificado a la solicitud
+    req.user = {
+      userId: decoded.userId,
+      nombre: decoded.nombre,
+      email: decoded.email
+    };
+     // Adjuntar el usuario decodificado a la solicitud
     next(); // Procede al siguiente middleware o ruta
   } catch (error) {
     return res.status(401).json({ error: 'Token no válido.' });
@@ -250,7 +257,11 @@ app.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Correo electrónico o contraseña incorrectos' });
     }
 
-    const token = jwt.sign({ userId: user.id, rol: user.rol }, 'secret_key', { expiresIn: '1h' });
+    const token = jwt.sign(
+      { userId: user.id, nombre: user.nombre, email: user.email, rol: user.rol },
+      'secret_key',
+      { expiresIn: '1h' }
+    );
     res.status(200).json({ token });
   } catch (error) {
     console.error(error);
@@ -258,20 +269,17 @@ app.post('/login', async (req, res) => {
   }
 });
 
-// Ruta para obtener todos los servicios turísticos, con filtro de provincia opcional
+// Ruta para obtener todos los servicios turísticos
 app.get('/servicios', async (req, res) => {
-  const { provincia } = req.query;
-
   try {
-    let query = 'SELECT * FROM servicios';
-    let values = [];
+    const query = `
+      SELECT s.* 
+      FROM servicios s
+      JOIN usuarios u ON s.empresa_id = u.id
+      WHERE u.publico = true
+    `;
 
-    if (provincia) {
-      query += ' WHERE provincia = $1';
-      values.push(provincia);
-    }
-
-    const result = await pool.query(query, values);
+    const result = await pool.query(query);
     res.status(200).json(result.rows);
   } catch (error) {
     console.error(error);
@@ -319,10 +327,10 @@ const uploadEmp = multer({
   }
 });
 
-// Endpoint para actualizar los campos ubicacion, imagen_empresarial y detalles
+// Endpoint para actualizar los campos ubicacion, imagen_empresarial, detalles y localizacion
 app.put('/update_company_fields/:id', authenticateToken, uploadEmp.single('imagen_empresarial'), async (req, res) => {
   const { id } = req.params;
-  const { ubicacion, detalles } = req.body;
+  const { ubicacion, detalles, localizacion } = req.body;
   let imagenEmpresarialUrl = null;
 
   if (req.file) {
@@ -331,8 +339,8 @@ app.put('/update_company_fields/:id', authenticateToken, uploadEmp.single('image
 
   try {
     const result = await pool.query(
-      'UPDATE usuarios SET ubicacion = $1, imagen_empresarial = $2, detalles = $3 WHERE id = $4',
-      [ubicacion, imagenEmpresarialUrl, detalles, id]
+      'UPDATE usuarios SET ubicacion = $1, imagen_empresarial = $2, detalles = $3, localizacion = $4 WHERE id = $5',
+      [ubicacion, imagenEmpresarialUrl, detalles, localizacion, id]
     );
 
     if (result.rowCount === 0) {
@@ -349,7 +357,7 @@ app.put('/update_company_fields/:id', authenticateToken, uploadEmp.single('image
 // Ruta para listar todos los usuarios
 app.get('/destinos', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query("SELECT id, nombre_usuario, ubicacion, detalles, imagen_empresarial FROM usuarios WHERE rol = 'turista'");
+    const result = await pool.query("SELECT id, nombre_usuario, ubicacion, detalles, imagen_empresarial FROM usuarios WHERE rol = 'turista' AND publico = true");
     res.status(200).json(result.rows);
   } catch (error) {
     console.error(error);
@@ -398,8 +406,8 @@ app.post('/registrar_servicios', authenticateToken, checkRole(['turista']), uplo
 
   try {
     const result = await pool.query(
-      'INSERT INTO servicios (nombre, descripcion, empresa_id, creado_en, precio, ubicacion, imagen_servicio) VALUES ($1, $2, $3, NOW(), $4, $5, $6) RETURNING id',
-      [nombre, descripcion, empresaId, precio, ubicacion, imagenServicioUrl]
+      'INSERT INTO servicios (nombre, descripcion, empresa_id, creado_en, precio, imagen_servicio) VALUES ($1, $2, $3, NOW(), $4, $5) RETURNING id',
+      [nombre, descripcion, empresaId, precio, imagenServicioUrl]
     );
 
     res.status(201).json({ message: 'Servicio registrado correctamente', servicioId: result.rows[0].id });
@@ -424,3 +432,332 @@ app.get('/empresa/:empresaId/servicios', authenticateToken, async (req, res) => 
     res.status(500).json({ error: 'Error al obtener los servicios de la empresa' });
   }
 });
+
+// Ruta para registrar una nueva promoción
+app.post('/promociones', authenticateToken, async (req, res) => {
+  const { servicio_id, nombre_servicio, fecha, estado, detalles } = req.body;
+  const usuario_id = req.user.userId; // Obtener el ID del usuario logueado
+
+  try {
+    const result = await pool.query(
+      'INSERT INTO promociones (servicio_id, nombre_servicio, usuario_id, fecha, estado, creado_en, detalles) VALUES ($1, $2, $3, $4, $5, NOW(), $6) RETURNING id',
+      [servicio_id, nombre_servicio, usuario_id, fecha, estado, detalles]
+    );
+
+    res.status(201).json({ message: 'Promoción registrada correctamente', promocionId: result.rows[0].id });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al registrar la promoción' });
+  }
+});
+
+// Ruta para listar todos los servicios del usuario registrado
+app.get('/mis_servicios', authenticateToken, async (req, res) => {
+  const usuarioId = req.user.userId;
+
+  try {
+    const result = await pool.query('SELECT id, nombre FROM servicios WHERE empresa_id = $1', [usuarioId]);
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al obtener los servicios del usuario' });
+  }
+});
+
+// Ruta para listar todas las promociones
+app.get('/listar_promociones', authenticateToken, async (req, res) => {
+  try {
+    const query = `
+      SELECT p.* 
+      FROM promociones p
+      JOIN usuarios u ON p.usuario_id = u.id
+      WHERE u.publico = true
+    `;
+
+    const result = await pool.query(query);
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al obtener las promociones' });
+  }
+});
+
+async function incrementarReservas(usuarioId) {
+  try {
+    await pool.query("UPDATE usuarios SET reservas = reservas + 1 WHERE id = $1", [usuarioId]);
+  } catch (error) {
+    console.error('Error al incrementar el contador de reservas:', error);
+  }
+}
+
+// Ruta para registrar una nueva reserva
+app.post('/reservas', authenticateToken, async (req, res) => {
+  const { usuario_id, telefono, fecha, hora, detalles, total_pagar } = req.body;
+  const usuario_registrado = req.user.userId; // Obtener el ID del usuario logueado
+  const nombre_usuario = req.user.nombre; // Obtener el nombre del usuario logueado
+  const correo = req.user.email; // Obtener el correo del usuario logueado
+
+  try {
+    const result = await pool.query(
+      'INSERT INTO reservas (usuario_id, nombre_usuario, correo, telefono, fecha, hora, estado, creado_en, detalles, total_pagar, usuario_registrado) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9, $10) RETURNING id',
+      [usuario_id, nombre_usuario, correo, telefono, fecha, hora, 'reservado', detalles, total_pagar, usuario_registrado]
+    );
+
+    await incrementarReservas(usuario_id);
+
+    res.status(201).json({ message: 'Reserva registrada correctamente', reservaId: result.rows[0].id });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al registrar la reserva' });
+  }
+});
+
+// Ruta para actualizar una reserva
+app.put('/reservas/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const { transaction_id } = req.body;
+
+  try {
+    const result = await pool.query(
+      'UPDATE reservas SET transaction_id = $1 WHERE id = $2 RETURNING id',
+      [transaction_id, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Reserva no encontrada' });
+    }
+
+    res.status(200).json({ message: 'Reserva actualizada correctamente' });
+  } catch (error) {
+    console.error('Error al actualizar la reserva:', error);
+    res.status(500).json({ error: 'Error al actualizar la reserva' });
+  }
+});
+
+
+
+// Ruta para listar todas las reservas del usuario logueado con estado "reservado"
+app.get('/listar_reservas', authenticateToken, async (req, res) => {
+  const usuario_registrado = req.user.userId; // Obtener el ID del usuario logueado
+
+  try {
+    const result = await pool.query(`
+      SELECT r.*, u.*
+      FROM reservas r
+      JOIN usuarios u ON r.usuario_id = u.id
+      WHERE r.usuario_registrado = $1 AND r.estado = 'reservado'
+    `, [usuario_registrado]);
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al obtener las reservas' });
+  }
+});
+
+// Endpoint para obtener el estado del campo 'publico'
+app.get('/usuarios/:id/publico', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query('SELECT publico FROM usuarios WHERE id = $1', [id]);
+    if (result.rows.length > 0) {
+      res.json({ publico: result.rows[0].publico });
+    } else {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'Error al obtener el estado del campo publico' });
+  }
+});
+
+// Endpoint para hacer toggle del campo 'publico'
+app.post('/usuarios/:id/toggle-publico', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query('SELECT publico FROM usuarios WHERE id = $1', [id]);
+    if (result.rows.length > 0) {
+      const currentPublico = result.rows[0].publico;
+      const newPublico = !currentPublico;
+      await pool.query('UPDATE usuarios SET publico = $1 WHERE id = $2', [newPublico, id]);
+      res.json({ publico: newPublico });
+    } else {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'Error al actualizar el estado del campo publico' });
+  }
+});
+
+// Ruta para buscar destinos
+app.get('/buscar-destinos', authenticateToken, async (req, res) => {
+  const { search } = req.query;
+
+  if (!search) {
+    return res.status(400).json({ error: 'El término de búsqueda es requerido' });
+  }
+
+  try {
+    const query = `
+      SELECT id, nombre_usuario, ubicacion, detalles, imagen_empresarial 
+      FROM usuarios 
+      WHERE rol = 'turista' 
+        AND publico = true 
+        AND (nombre_usuario ILIKE $1 OR ubicacion ILIKE $1 OR detalles ILIKE $1)
+    `;
+    const values = [`%${search}%`];
+
+    const result = await pool.query(query, values);
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al buscar destinos' });
+  }
+});
+
+// Configura Braintree
+const gateway = new braintree.BraintreeGateway({
+  environment: braintree.Environment[process.env.BRAINTREE_ENVIRONMENT],
+  merchantId: process.env.BRAINTREE_MERCHANT_ID,
+  publicKey: process.env.BRAINTREE_PUBLIC_KEY,
+  privateKey: process.env.BRAINTREE_PRIVATE_KEY,
+  paypal: {
+    payeeEmail: process.env.PAYPAL_PAYEE_EMAIL,
+    flow: 'checkout',
+    amount: '10.00',
+    currency: 'USD'
+  },
+  googlePay: {
+    merchantId: process.env.GOOGLE_PAY_MERCHANT_ID,
+  }
+});
+
+app.get('/client_token', (req, res) => {
+  const clientTokenRequest = {
+    merchantAccountId: 'pahti'
+  };
+
+  gateway.clientToken.generate(clientTokenRequest, (err, response) => {
+    if (err) {
+      res.status(500).send(err);
+    } else {
+      res.send(response.clientToken);
+    }
+  });
+});
+
+app.post('/checkout', async (req, res) => {
+  const nonceFromTheClient = req.body.paymentMethodNonce;
+  const amount = req.body.amount;
+  const paymentMethod = req.body.paymentMethod;
+  const reservationId = req.body.reservationId; // Asegúrate de recibir el ID de la reserva
+
+  let nonceToUse = nonceFromTheClient;
+
+  if (paymentMethod === 'googlePay') {
+    nonceToUse = 'fake-google-pay-nonce';
+  }
+
+  try {
+    const result = await gateway.transaction.sale({
+      amount: amount,
+      paymentMethodNonce: nonceToUse,
+      merchantAccountId: 'pahti',
+      options: {
+        submitForSettlement: true
+      }
+    });
+
+    if (!result.success) {
+      console.error('Error procesando la transacción:', result.message);
+      return res.status(500).send(result.message);
+    }
+
+    // Guarda el transactionId en la base de datos
+    const transactionId = result.transaction.id;
+    await pool.query('UPDATE reservas SET transaction_id = $1 WHERE id = $2', [transactionId, reservationId]);
+
+    res.send({ transactionId, result });
+  } catch (err) {
+    console.error('Error procesando la transacción:', err);
+    res.status(500).send(err);
+  }
+});
+
+// Endpoint para realizar un reembolso
+app.post('/refund', authenticateToken, async (req, res) => {
+  const { reservationId } = req.body;
+
+  try {
+    // Obtener el transaction_id y el total_pagar de la reserva
+    const result = await pool.query('SELECT transaction_id, total_pagar FROM reservas WHERE id = $1', [reservationId]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Reserva no encontrada' });
+    }
+
+    const { transaction_id: transactionId, total_pagar: amount } = result.rows[0];
+
+    // Obtener el estado de la transacción
+    const transaction = await gateway.transaction.find(transactionId);
+
+    let refundResult;
+    if (transaction.status === 'settled' || transaction.status === 'settling') {
+      // Realizar el reembolso si la transacción está liquidada o en proceso de liquidación
+      refundResult = await gateway.transaction.refund(transactionId, amount);
+    } else {
+      // Anular la transacción si aún no está liquidada
+      refundResult = await gateway.transaction.void(transactionId);
+    }
+
+    if (!refundResult.success) {
+      console.error('Error procesando el reembolso/anulación:', refundResult.message);
+      return res.status(500).json({ error: refundResult.message });
+    }
+
+    // Actualizar el estado de la reserva a "cancelado"
+    await pool.query('UPDATE reservas SET estado = $1 WHERE id = $2', ['cancelado', reservationId]);
+
+    res.status(200).json(refundResult);
+  } catch (error) {
+    console.error('Error al procesar el reembolso/anulación:', error);
+    res.status(500).json({ error: 'Error al procesar el reembolso/anulación' });
+  }
+});
+
+
+// Ruta para buscar destinos
+app.get('/buscar-destinos', authenticateToken, async (req, res) => {
+  const { search } = req.query;
+
+  if (!search) {
+    return res.status(400).json({ error: 'El término de búsqueda es requerido' });
+  }
+
+  try {
+    const query = `
+      SELECT id, nombre_usuario, ubicacion, detalles, imagen_empresarial 
+      FROM usuarios 
+      WHERE rol = 'turista' 
+        AND publico = true 
+        AND (nombre_usuario ILIKE $1 OR ubicacion ILIKE $1 OR detalles ILIKE $1)
+    `;
+    const values = [`%${search}%`];
+
+    const result = await pool.query(query, values);
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al buscar destinos' });
+  }
+});
+
+// Endpoint para obtener los 3 usuarios con más reservas y que tienen publico en true
+app.get('/usuarios/top-reservas', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM usuarios WHERE publico = true ORDER BY reservas DESC LIMIT 3');
+    res.status(200).json(result.rows);
+  } catch (error) {
+    console.error('Error al obtener los usuarios con más reservas:', error);
+    res.status(500).json({ error: 'Error al obtener los usuarios con más reservas' });
+  }
+});
+
