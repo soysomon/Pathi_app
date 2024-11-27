@@ -41,7 +41,8 @@ class _ReservationsListState extends State<ReservationsList> {
     final token = prefs.getString('jwt_token');
     if (token == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Token no disponible, inicia sesión nuevamente')),
+        SnackBar(
+            content: Text('Token no disponible, inicia sesión nuevamente')),
       );
       return;
     }
@@ -65,7 +66,7 @@ class _ReservationsListState extends State<ReservationsList> {
     }
   }
 
-  Future<void> cancelReservation(int reservationId) async {
+  Future<void> cancelReservation(String transactionId) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('jwt_token');
     if (token == null) {
@@ -74,7 +75,7 @@ class _ReservationsListState extends State<ReservationsList> {
       );
       return;
     }
-
+  
     try {
       final response = await http.post(
         Uri.parse('${dotenv.env['API_BASE_URL']}/refund'),
@@ -83,17 +84,17 @@ class _ReservationsListState extends State<ReservationsList> {
           'Authorization': 'Bearer $token',
         },
         body: json.encode({
-          'reservationId': reservationId,
+          'transactionId': transactionId, // Asegúrate de que este sea el ID de la tabla de reservaciones
         }),
       );
-
+  
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Reserva cancelada y reembolso realizado correctamente')),
         );
         fetchReservations(); // Refrescar la lista de reservas
       } else {
-        print('Error al cancelar la reserva: ${response.body}');
+        print('Error al cancelar reserva: ${response.body}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error al cancelar la reserva: ${response.body}')),
         );
@@ -125,6 +126,7 @@ class _ReservationsListState extends State<ReservationsList> {
       itemCount: reservations.length,
       itemBuilder: (context, index) {
         final reservation = reservations[index];
+        print(reservation);
         return ReservationCard(
           image: reservation['imagen_empresarial'],
           reservationName: reservation['nombre_usuario'],
@@ -136,7 +138,7 @@ class _ReservationsListState extends State<ReservationsList> {
           userName: reservation['nombre_usuario'],
           userLocation: reservation['ubicacion'],
           userDetails: reservation['detalles'],
-          onCancel: () => cancelReservation(reservation['id']),
+          onCancel: () => cancelReservation(reservation['transaction_id']),
         );
       },
     );

@@ -682,28 +682,29 @@ app.post('/checkout', async (req, res) => {
 
 // Endpoint para realizar un reembolso
 app.post('/refund', authenticateToken, async (req, res) => {
-  const { reservationId } = req.body;
+  const { transactionId } = req.body;
+  console.log(`Received refund request for transaction ID: ${transactionId}`);
 
   try {
-    // Obtener el transaction_id y el total_pagar de la reserva
-    const result = await pool.query('SELECT transaction_id, total_pagar FROM reservas WHERE id = $1', [reservationId]);
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: 'Reserva no encontrada' });
-    }
-
-    const { transaction_id: transactionId, total_pagar: amount } = result.rows[0];
-
     // Obtener el estado de la transacción
     const transaction = await gateway.transaction.find(transactionId);
+    console.log(`Transaction status: ${transaction.status}`);
 
     let refundResult;
-    if (transaction.status === 'settled' || transaction.status === 'settling') {
-      // Realizar el reembolso si la transacción está liquidada o en proceso de liquidación
-      refundResult = await gateway.transaction.refund(transactionId, amount);
-    } else {
-      // Anular la transacción si aún no está liquidada
+
+    // Manejar diferentes estados de la transacción
+    if (transaction.status === 'authorized' || transaction.status === 'submitted_for_settlement') {
+      // Intentar anular la transacción si está en estado "Authorized" o "Submitted For Settlement"
       refundResult = await gateway.transaction.void(transactionId);
+    } else if (transaction.status === 'settled' || transaction.status === 'settling') {
+      // Realizar el reembolso si la transacción está liquidada o en proceso de liquidación
+      refundResult = await gateway.transaction.refund(transactionId, transaction.amount);
+    } else if (transaction.status === 'voided') {
+      // La transacción ya está anulada
+      refundResult = { success: true, message: 'Transaction already voided' };
+    } else {
+      // Manejar otros estados de la transacción
+      refundResult = { success: false, message: `Cannot process refund/void for transaction status: ${transaction.status}` };
     }
 
     if (!refundResult.success) {
@@ -712,7 +713,8 @@ app.post('/refund', authenticateToken, async (req, res) => {
     }
 
     // Actualizar el estado de la reserva a "cancelado"
-    await pool.query('UPDATE reservas SET estado = $1 WHERE id = $2', ['cancelado', reservationId]);
+    await pool.query('UPDATE reservas SET estado = $1 WHERE transaction_id = $2', ['cancelado', transactionId]);
+    console.log(`Transaction ID ${transactionId} updated to 'cancelado'`);
 
     res.status(200).json(refundResult);
   } catch (error) {
@@ -720,7 +722,6 @@ app.post('/refund', authenticateToken, async (req, res) => {
     res.status(500).json({ error: 'Error al procesar el reembolso/anulación' });
   }
 });
-
 
 // Ruta para buscar destinos
 app.get('/buscar-destinos', authenticateToken, async (req, res) => {
